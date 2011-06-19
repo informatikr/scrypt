@@ -22,7 +22,7 @@ description:
     .
     Details of the scrypt key derivation function are given in a paper by
     Colin Percival, Stronger Key Derivation via Sequential Memory-Hard
-    Functions (<http://www.tarsnap.com/scrypt/scrypt-slides.pdf>).
+    Functions (<http://www.tarsnap.com/scrypt/scrypt.pdf>).
 
 extra-source-files:
     README.markdown,
