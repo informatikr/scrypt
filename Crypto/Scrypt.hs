@@ -2,10 +2,8 @@
 
 -- |Scrypt is a sequential memory-hard key derivation function. This module
 --  provides bindings to a fast C implementation of scrypt, written by Colin
---  Percival. See <http://www.tarsnap.com/scrypt.html> for more information
---  on scrypt.
-module Crypto.Scrypt
-    ( 
+--  Percival. For more information see <http://www.tarsnap.com/scrypt.html>.
+module Crypto.Scrypt ( 
     -- *Parameters to the @scrypt@ function
      ScryptParams, params, defaultParams
     -- * The @scrypt@ key derivation function
@@ -32,7 +30,7 @@ newtype PassHash = PassHash ByteString deriving (Show,Eq)
 --  'params' function takes @log_2(N)@ as a parameter. As an example, the
 --  'defaultParams'
 --  
---  @   log_2(N) = 14, r = 8, and p = 1@
+--  @   log_2(N) = 14, r = 8 and p = 1@
 --
 --  lead to 'scrypt' using @128 * 8 * 2^14 = 16M@ bytes of memory.
 --
@@ -47,10 +45,10 @@ params :: Integer
        -- ^ @log_2(N)@. Scrypt's @N@ parameter must be a power of two greater
        -- than one, thus it's logarithm to base two must be greater than zero. 
        -> Integer
-       -- ^ The parameter @r@, an integer greater than zero.
+       -- ^ The parameter @r@, must be greater than zero.
        -> Integer
-       -- ^ The parameter @p@, an integer greater than zero. @r@ and @p@
-       --   must satisfy @r * p < 2^30@.
+       -- ^ The parameter @p@, must be greater than zero. @r@ and @p@
+       --   must satisfy @r*p < 2^30@.
        -> Maybe ScryptParams
        -- ^ Returns 'Just' the parameter object for valid arguments,
        --   otherwise 'Nothing'.
@@ -82,16 +80,16 @@ scrypt Params{..} (Salt salt) (Pass pass) =
         useAsCStringLen salt $ \(saltPtr, saltLen) ->
         useAsCStringLen pass $ \(passPtr, passLen) ->
         allocaBytes (fromIntegral bufLen) $ \bufPtr -> do
-            throwErrnoIfMinus1_ "c_scrypt" $ c_scrypt
+            throwErrnoIfMinus1_ "crypto_scrypt" $ crypto_scrypt
                 (castPtr passPtr) (fromIntegral passLen)
                 (castPtr saltPtr) (fromIntegral saltLen)
                 (2^logN) (fromIntegral r) (fromIntegral p)
                 bufPtr (fromIntegral bufLen)
             packCStringLen (castPtr bufPtr, fromIntegral bufLen)
 
-foreign import ccall unsafe "crypto_scrypt" c_scrypt
-    :: Ptr Word8 -> CSize
-    -> Ptr Word8 -> CSize
+foreign import ccall unsafe crypto_scrypt
+    :: Ptr Word8 -> CSize         -- password
+    -> Ptr Word8 -> CSize         -- salt
     -> Word64 -> Word32 -> Word32 -- N, r, p
-    -> Ptr Word8 -> CSize
+    -> Ptr Word8 -> CSize         -- result buffer
     -> IO CInt
