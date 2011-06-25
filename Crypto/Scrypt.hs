@@ -12,7 +12,7 @@ module Crypto.Scrypt (
     ) where
 
 import Control.Applicative ((<$>))
-import Data.ByteString
+import Data.ByteString (ByteString, useAsCStringLen, packCStringLen, hGet)
 import Data.Maybe
 import Foreign
 import Foreign.C
@@ -39,6 +39,14 @@ newtype PassHash = PassHash { unHash :: ByteString } deriving (Show,Eq)
 --  used to tune the running time of 'scrypt'.
 --
 data ScryptParams = Params { logN, r, p, bufLen :: Integer}
+
+instance Show ScryptParams where
+    show Params{..} = concat [ "ScryptParams "
+        , "{ logN=", show logN
+        , ", r="   , show r
+        , ", p="   , show p
+        , " }"
+        ]
 
 -- |Constructor function for the 'ScryptParams' data type
 params :: Integer
