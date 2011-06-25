@@ -5,10 +5,10 @@
 --  Percival. For more information see <http://www.tarsnap.com/scrypt.html>.
 module Crypto.Scrypt ( 
     -- *Parameters to the @scrypt@ function
-     ScryptParams, params, defaultParams
+     ScryptParams, params
     -- * The @scrypt@ key derivation function
-    , scrypt, getSalt
     , Pass(..), Salt(..), PassHash(..)
+    , scrypt, scrypt', getSalt
     ) where
 
 import Control.Applicative ((<$>))
@@ -19,9 +19,9 @@ import Foreign.C
 import System.IO
 
 
-newtype Pass = Pass ByteString deriving (Show)
-newtype Salt = Salt ByteString deriving (Show)
-newtype PassHash = PassHash ByteString deriving (Show,Eq)
+newtype Pass = Pass { unPass :: ByteString } deriving (Show)
+newtype Salt = Salt { unSalt :: ByteString } deriving (Show)
+newtype PassHash = PassHash { unHash :: ByteString } deriving (Show,Eq)
 
 -- |Encapsulates the three tuning parameters to the 'scrypt' function: @N@,
 --  @r@ and @p@. The parameters affect running time and memory usage:
@@ -61,18 +61,6 @@ params logN r p | valid     = Just ps
                 , bufLen ps <= 2^(32 :: Int)-1 * 32
                 ]
 
--- |Default parameters as recommended in the scrypt paper:
---
---  @   N = 2^14, r = 8, p = 1 @
---
---  Equivalent to @'fromJust' ('params' 14 8 1)@.
-defaultParams :: ScryptParams
-defaultParams = fromJust (params 14 8 1)
-
--- |Reads a 32-byte random salt from @\/dev\/urandom@.
-getSalt :: IO Salt
-getSalt = Salt <$> withBinaryFile "/dev/urandom" ReadMode (flip hGet 32)
-
 -- |Calculates a 64-byte hash from the given password, salt and parameters.
 scrypt :: ScryptParams -> Salt -> Pass -> PassHash
 scrypt Params{..} (Salt salt) (Pass pass) =
@@ -93,3 +81,16 @@ foreign import ccall unsafe crypto_scrypt
     -> Word64 -> Word32 -> Word32 -- N, r, p
     -> Ptr Word8 -> CSize         -- result buffer
     -> IO CInt
+
+-- |Note the prime symbol (\'). Calls 'scrypt' with default parameters as
+--  recommended in the scrypt paper:
+--
+--  @   N = 2^14, r = 8, p = 1 @
+--
+--  Equivalent to @'scrypt' ('fromJust' ('params' 14 8 1))@.
+scrypt' :: Salt -> Pass -> PassHash
+scrypt' = scrypt $ fromJust (params 14 8 1)
+
+-- |Reads a 32-byte random salt from @\/dev\/urandom@.
+getSalt :: IO Salt
+getSalt = Salt <$> withBinaryFile "/dev/urandom" ReadMode (flip hGet 32)
