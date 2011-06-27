@@ -28,7 +28,7 @@ newtype PassHash = PassHash { unHash :: ByteString } deriving (Show,Eq)
 --
 --  /Memory usage/ is approximately @128*r*N@ bytes. Note that the
 --  'params' function takes @log_2(N)@ as a parameter. As an example, the
---  'defaultParams'
+--  default parameters used by 'scrypt''
 --  
 --  @   log_2(N) = 14, r = 8 and p = 1@
 --
