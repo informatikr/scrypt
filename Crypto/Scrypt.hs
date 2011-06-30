@@ -19,8 +19,8 @@ import Foreign.C
 import System.IO
 
 
-newtype Pass = Pass { unPass :: ByteString } deriving (Show)
-newtype Salt = Salt { unSalt :: ByteString } deriving (Show)
+newtype Pass = Pass { unPass :: ByteString } deriving (Show, Eq)
+newtype Salt = Salt { unSalt :: ByteString } deriving (Show, Eq)
 newtype PassHash = PassHash { unHash :: ByteString } deriving (Show,Eq)
 
 -- |Encapsulates the three tuning parameters to the 'scrypt' function: @N@,
