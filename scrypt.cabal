@@ -35,6 +35,7 @@ library
 
     build-depends:
         base == 4.*,
+        base64-bytestring == 0.1.*,
         bytestring == 0.9.*
 
     ghc-options: -Wall
