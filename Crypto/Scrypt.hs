@@ -193,10 +193,11 @@ verifyPass newParams candidate encrypted =
                         else Just (combine newParams salt newHash)
         in (valid, newEncr)
 
--- |Equivalent to @verifyPass defaultParams@.
+-- |Check the 'Pass' against the 'EncryptedPass', using the 'ScryptParams'
+--  encapsulated in the 'EncryptedPass'.
 --
-verifyPass' :: Pass -> EncryptedPass -> (Bool, Maybe EncryptedPass)
-verifyPass' = verifyPass defaultParams
+verifyPass' :: Pass -> EncryptedPass -> Bool
+verifyPass' pass encrypted = fst $ verifyPass defaultParams pass encrypted
 
 ------------------------------------------------------------------------------
 -- $low-level
