@@ -2,20 +2,24 @@
     RecordWildCards, NamedFieldPuns #-}
 
 -- |Scrypt is a sequential memory-hard key derivation function. This module
---  provides bindings to a fast C implementation of scrypt, written by Colin
---  Percival. For more information see <http://www.tarsnap.com/scrypt.html>.
-module Crypto.Scrypt ( 
+--  provides low-level bindings to the 'scrypt' key derivation function as
+--  well as a higher-level password-storage API. It is based on a fast C
+--  implementation of scrypt, written by Colin Percival. For further
+--  information see <http://www.tarsnap.com/scrypt.html>.
+--
+module Crypto.Scrypt (
     -- *Parameters to the @scrypt@ function
-     ScryptParams, scryptParams
+    -- $params
+     ScryptParams, scryptParams, defaultParams
     -- * Password Storage
-    , EncryptedPass(..), encryptPass, verifyPass
+    -- $password-storage
+    , EncryptedPass(..), encryptPass, encryptPass', verifyPass, verifyPass'
     -- * Low-level bindings to the @scrypt@ key derivation function
-    , Pass(..), Salt(..), PassHash(..)
-    , scrypt, scrypt'
+    -- $low-level
+    , Pass(..), Salt(..), PassHash(..), scrypt, scrypt'
     ) where
 
 import Control.Applicative
-import Control.Monad
 import Data.ByteString.Base64 (encode)
 import qualified Data.ByteString.Base64 as Base64
 import Data.ByteString.Char8 hiding (map, concat)
@@ -32,23 +36,26 @@ newtype EncryptedPass =
     EncryptedPass { unEncryptedPass  :: ByteString } deriving (Show, Eq)
 
 ------------------------------------------------------------------------------
--- Scrypt Parameters
+-- $params
 --
-
--- |Encapsulates the three tuning parameters to the 'scrypt' function: @N@,
---  @r@ and @p@. The parameters affect running time and memory usage:
+-- Scrypt takes three tuning parameters: @N@, @r@ and @p@. The parameters
+-- affect running time and memory usage:
 --
---  /Memory usage/ is approximately @128*r*N@ bytes. Note that the
---  'params' function takes @log_2(N)@ as a parameter. As an example, the
---  default parameters used by 'scrypt''
---  
---  @   log_2(N) = 14, r = 8 and p = 1@
+-- /Memory usage/ is approximately @128*r*N@ bytes. Note that the
+--  'scryptParams' function takes @log_2(N)@ as a parameter. As an example,
+--  the 'defaultParams'
+--
+--  >   log_2(N) = 14, r = 8 and p = 1
 --
 --  lead to 'scrypt' using @128 * 8 * 2^14 = 16M@ bytes of memory.
 --
 --  /Running time/ is proportional to all of @N@, @r@ and @p@. However
---  @p@ only as an insignificant influence on memory usage an can thus be
---  used to tune the running time of 'scrypt'.
+--  @p@ only has an insignificant influence on memory usage an can thus be
+--  used to independently tune the running time of 'scrypt'.
+--
+
+-- |Encapsulates the three tuning parameters to the 'scrypt' function: @N@,
+--  @r@ and @p@ (see above).
 --
 data ScryptParams = Params { logN, r, p, bufLen :: Integer} deriving (Eq)
 
@@ -61,10 +68,12 @@ instance Show ScryptParams where
         ]
 
 -- |Constructor function for the 'ScryptParams' data type
+--
 scryptParams
     :: Integer
     -- ^ @log_2(N)@. Scrypt's @N@ parameter must be a power of two greater
-    -- than one, thus it's logarithm to base two must be greater than zero. 
+    --   than one, thus it's logarithm to base two must be greater than zero.
+    --   @128*r*N@ must be smaller than the available memory address space.
     -> Integer
     -- ^ The parameter @r@, must be greater than zero.
     -> Integer
@@ -73,6 +82,7 @@ scryptParams
     -> Maybe ScryptParams
     -- ^ Returns 'Just' the parameter object for valid arguments,
     --   otherwise 'Nothing'.
+    --
 scryptParams logN r p | valid     = Just ps
                       | otherwise = Nothing
   where
@@ -80,31 +90,44 @@ scryptParams logN r p | valid     = Just ps
     valid = and [ logN > 0, r > 0, p > 0
                 , r*p < 2^(30 :: Int)
                 , bufLen ps <= 2^(32 :: Int)-1 * 32
+                -- allocation fits into (virtual) memory
+                , 128*r*2^logN <= fromIntegral (maxBound :: CSize)
                 ]
 
-------------------------------------------------------------------------------
--- Password Storage API
+-- |Default parameters as recommended in the scrypt paper:
 --
-encryptPass :: ScryptParams -> Pass -> IO EncryptedPass
-encryptPass params pass = do
-    salt <- Salt <$> withBinaryFile "/dev/urandom" ReadMode (`hGet` 32)
-    return $ combine params salt (scrypt params salt pass)
+--  >   N = 2^14, r = 8, p = 1
+--
+--  Equivalent to @'fromJust' ('scryptParams' 14 8 1)@.
+--
+defaultParams :: ScryptParams
+defaultParams = fromJust (scryptParams 14 8 1)
 
-verifyPass
-    :: ScryptParams
-    -> Pass
-    -> EncryptedPass
-    -> (Bool, Maybe EncryptedPass)
-verifyPass newParams candidate encrypted =
-    maybe (False, Nothing) verify (separate encrypted)
-  where
-    verify (params,salt,hash) =
-        let valid   = scrypt params salt candidate == hash
-            newHash = scrypt newParams salt candidate
-            newEncr = if not valid || params == newParams
-                        then Nothing
-                        else Just (combine newParams salt newHash)
-        in (valid, newEncr)
+------------------------------------------------------------------------------
+-- $password-storage
+--
+-- To allow storing encrypted passwords conveniently in a single database
+-- column, the password storage API provides the data type 'EncryptedPass'. It
+-- combines a 'Pass' as well as the 'Salt' and 'ScryptParams' used to compute
+-- it into a single 'ByteString', separated by pipe (\"|\") characters. The
+-- 'Salt' and 'PassHash' are base64-encoded. Storing the 'ScryptParams' with 
+-- the password allows to gradually strengthen password encryption in case of
+-- changing security requirements.
+--
+-- A usage example is given below, showing encryption, verification and
+-- changing 'ScryptParams':
+--
+-- > >>> encrypted <- encryptPass defaultParams (Pass "secret")
+-- > >>> print encrypted
+-- > EncryptedPass {unEncryptedPass = "14|8|1|Wn5x[SNIP]nM=|Zl+p[SNIP]g=="}
+-- > >>> print $ verifyPass defaultParams (Pass "secret") encrypted
+-- > (True,Nothing)
+-- > >>> print $ verifyPass defaultParams (Pass "wrong") encrypted
+-- > (False,Nothing)
+-- > >>> let newParams = fromJust $ scryptParams 16 8 1
+-- > >>> print $ verifyPass newParams (Pass "secret") encrypted
+-- > (True,Just (EncryptedPass {unEncryptedPass = "16|8|1|Wn5x[SNIP]nM=|ZmWw[SNIP]Q=="}))
+--
 
 combine :: ScryptParams -> Salt -> PassHash -> EncryptedPass
 combine Params{..} (Salt salt) (PassHash passHash) =
@@ -117,20 +140,73 @@ separate :: EncryptedPass -> Maybe (ScryptParams, Salt, PassHash)
 separate = go . split '|' . unEncryptedPass
   where
     go [logN', r', p', salt', hash'] = do
-        [salt,hash] <- sequence (map decode [salt', hash'])
-        params      <- join $
-            scryptParams <$> readI logN' <*> readI r' <*> readI p'        
+        [salt, hash] <- mapM decodeBase64 [salt', hash']
+        [logN, r, p] <- mapM (fmap fst . readInteger) [logN', r', p']
+        params       <- scryptParams logN r p
         return (params, Salt salt, PassHash hash)
-    go _    = Nothing
+    go _          = Nothing
+    decodeBase64  = either (const Nothing) Just . Base64.decode
 
-    readI x = fst <$> readInteger x
-    decode  = either (const Nothing) Just . Base64.decode
+-- |Encrypt the password with the given parameters and a random 32-byte salt.
+-- The salt is read from @\/dev\/urandom@.
+--
+encryptPass :: ScryptParams -> Pass -> IO EncryptedPass
+encryptPass params pass = do
+    salt <- Salt <$> withBinaryFile "/dev/urandom" ReadMode (`hGet` 32)
+    return $ combine params salt (scrypt params salt pass)
+
+-- |Equivalent to @encryptPass defaultParams@.
+--
+encryptPass' :: Pass -> IO EncryptedPass
+encryptPass' = encryptPass defaultParams
+
+-- |Verify a 'Pass' against an 'EncryptedPass'. The function also takes
+--  'ScryptParams' meeting your current security requirements. In case the
+--  'EncryptedPass' was generated with different parameters, the function
+--  returns an updated 'EncryptedPass', generated with the given 
+--  'ScryptParams'. The 'Salt' is kept from the given 'EncryptedPass'.
+--
+verifyPass
+    :: ScryptParams
+    -- ^ Parameters to use for updating the 'EncryptedPass'.
+    -> Pass
+    -- ^ The candidate 'Pass'.
+    -> EncryptedPass
+    -- ^ The 'EncryptedPass' to check against.
+    -> (Bool, Maybe EncryptedPass)
+    -- ^ Returns a pair of
+    --
+    --     * 'Bool' indicating verification success or failure.
+    --
+    --     * 'Just' a /new/ 'EncryptedPass' if the given 'ScryptParams' are
+    --      different from those encapsulated in the /given/ 'EncryptedPass',
+    --      otherwise 'Nothing'.
+    --
+verifyPass newParams candidate encrypted =
+    maybe (False, Nothing) verify (separate encrypted)
+  where
+    verify (params,salt,hash) =
+        let valid   = scrypt params salt candidate == hash
+            newHash = scrypt newParams salt candidate
+            newEncr = if not valid || params == newParams
+                        then Nothing
+                        else Just (combine newParams salt newHash)
+        in (valid, newEncr)
+
+-- |Equivalent to @verifyPass defaultParams@.
+--
+verifyPass' :: Pass -> EncryptedPass -> (Bool, Maybe EncryptedPass)
+verifyPass' = verifyPass defaultParams
 
 ------------------------------------------------------------------------------
--- Low-level API
+-- $low-level
+--
+-- Bindings to a fast C implementation of 'scrypt'. For password storage,
+-- consider using the more convenient higher-level API above.
 --
 
 -- |Calculates a 64-byte hash from the given password, salt and parameters.
+--
 scrypt :: ScryptParams -> Salt -> Pass -> PassHash
 scrypt Params{..} (Salt salt) (Pass pass) =
     PassHash <$> unsafePerformIO $
@@ -151,11 +227,7 @@ foreign import ccall unsafe crypto_scrypt
     -> Ptr Word8 -> CSize         -- result buffer
     -> IO CInt
 
--- |Note the prime symbol (\'). Calls 'scrypt' with default parameters as
---  recommended in the scrypt paper:
+-- |Note the prime symbol (\'). Calls 'scrypt' with 'defaultParams'.
 --
---  @   N = 2^14, r = 8, p = 1 @
---
---  Equivalent to @'scrypt' ('fromJust' ('params' 14 8 1))@.
 scrypt' :: Salt -> Pass -> PassHash
 scrypt' = scrypt $ fromJust (scryptParams 14 8 1)
