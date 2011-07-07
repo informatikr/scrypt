@@ -20,13 +20,12 @@ module Crypto.Scrypt (
     ) where
 
 import Control.Applicative
-import Data.ByteString.Base64 (encode)
 import qualified Data.ByteString.Base64 as Base64
 import Data.ByteString.Char8 hiding (map, concat)
 import Data.Maybe
 import Foreign
 import Foreign.C
-import System.IO
+import System.Entropy (getEntropy)
 
 
 newtype Pass          = Pass     { unPass :: ByteString } deriving (Show, Eq)
@@ -132,7 +131,8 @@ defaultParams = fromJust (scryptParams 14 8 1)
 combine :: ScryptParams -> Salt -> PassHash -> EncryptedPass
 combine Params{..} (Salt salt) (PassHash passHash) =
     EncryptedPass $ intercalate "|"
-        [showBS logN, showBS r, showBS p, encode salt, encode passHash]
+        [ showBS logN, showBS r, showBS p
+        , Base64.encode salt, Base64.encode passHash]
   where
     showBS = pack . show
 
@@ -148,11 +148,12 @@ separate = go . split '|' . unEncryptedPass
     decodeBase64 = either (const Nothing) Just . Base64.decode
 
 -- |Encrypt the password with the given parameters and a random 32-byte salt.
--- The salt is read from @\/dev\/urandom@.
+-- The salt is read from @\/dev\/urandom@ on Unix systems or @CryptoAPI@ on
+-- Windows.
 --
 encryptPass :: ScryptParams -> Pass -> IO EncryptedPass
 encryptPass params pass = do
-    salt <- Salt <$> withBinaryFile "/dev/urandom" ReadMode (`hGet` 32)
+    salt <- Salt <$> getEntropy 32
     return $ combine params salt (scrypt params salt pass)
 
 -- |Equivalent to @encryptPass defaultParams@.

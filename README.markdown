@@ -16,4 +16,6 @@ Master [git repository](http://github.com/informatikr/scrypt):
 
 # Authors
 
-This library is written and maintained by Falko Peters,  <falko.peters@gmail.com>.
+This library is written and maintained by Falko Peters, <falko.peters@gmail.com>.
+
+Thanks to Thomas DuBuisson for suggesting the changes to make this package windows-compatible.
