@@ -1,6 +1,6 @@
 # Welcome to scrypt
 
-This is a Haskell library providing bindings to [Colin Percival's `scrypt` implementation](http://www.tarsnap.com/scrypt.html). Scrypt is a key derivation function designed to be far more secure against hardware brute-force attacks than alternative functions such as PBKDF2 or bcrypt.
+This is a Haskell library providing bindings to [Colin Percival's scrypt implementation](http://www.tarsnap.com/scrypt.html). Scrypt is a key derivation function designed to be far more secure against hardware brute-force attacks than alternative functions such as PBKDF2 or bcrypt.
 
 Details of the scrypt key derivation function are given in a paper by Colin Percival, Stronger Key Derivation via Sequential Memory-Hard Functions: [PDF](http://www.tarsnap.com/scrypt/scrypt-slides.pdf).
 

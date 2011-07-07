@@ -8,7 +8,7 @@
 --  information see <http://www.tarsnap.com/scrypt.html>.
 --
 module Crypto.Scrypt (
-    -- *Parameters to the @scrypt@ function
+    -- * Parameters to the @scrypt@ function
     -- $params
      ScryptParams, scryptParams, defaultParams
     -- * Password Storage
@@ -38,24 +38,24 @@ newtype EncryptedPass =
 ------------------------------------------------------------------------------
 -- $params
 --
--- Scrypt takes three tuning parameters: @N@, @r@ and @p@. The parameters
--- affect running time and memory usage:
+-- Scrypt takes three tuning parameters: @N@, @r@ and @p@. They affect running
+-- time and memory usage:
 --
 -- /Memory usage/ is approximately @128*r*N@ bytes. Note that the
---  'scryptParams' function takes @log_2(N)@ as a parameter. As an example,
---  the 'defaultParams'
+-- 'scryptParams' function takes @log_2(N)@ as a parameter. As an example,
+-- the 'defaultParams'
 --
---  >   log_2(N) = 14, r = 8 and p = 1
+-- >   log_2(N) = 14, r = 8 and p = 1
 --
---  lead to 'scrypt' using @128 * 8 * 2^14 = 16M@ bytes of memory.
+-- lead to 'scrypt' using @128 * 8 * 2^14 = 16M@ bytes of memory.
 --
---  /Running time/ is proportional to all of @N@, @r@ and @p@. However
---  @p@ only has an insignificant influence on memory usage an can thus be
---  used to independently tune the running time of 'scrypt'.
+-- /Running time/ is proportional to all of @N@, @r@ and @p@. Since it's
+-- influence on memory usage is small, @p@ can be used to independently tune
+-- the running time.
 --
 
 -- |Encapsulates the three tuning parameters to the 'scrypt' function: @N@,
---  @r@ and @p@ (see above).
+-- @r@ and @p@ (see above).
 --
 data ScryptParams = Params { logN, r, p, bufLen :: Integer} deriving (Eq)
 
@@ -144,8 +144,8 @@ separate = go . split '|' . unEncryptedPass
         [logN, r, p] <- mapM (fmap fst . readInteger) [logN', r', p']
         params       <- scryptParams logN r p
         return (params, Salt salt, PassHash hash)
-    go _          = Nothing
-    decodeBase64  = either (const Nothing) Just . Base64.decode
+    go _         = Nothing
+    decodeBase64 = either (const Nothing) Just . Base64.decode
 
 -- |Encrypt the password with the given parameters and a random 32-byte salt.
 -- The salt is read from @\/dev\/urandom@.
@@ -231,4 +231,4 @@ foreign import ccall unsafe crypto_scrypt
 -- |Note the prime symbol (\'). Calls 'scrypt' with 'defaultParams'.
 --
 scrypt' :: Salt -> Pass -> PassHash
-scrypt' = scrypt $ fromJust (scryptParams 14 8 1)
+scrypt' = scrypt defaultParams
