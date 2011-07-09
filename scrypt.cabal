@@ -68,11 +68,10 @@ executable scrypt-test
             HUnit == 1.2.2.*,
             test-framework == 0.4.*,
             test-framework-hunit == 0.2.*
-
     else
         buildable: False
 
-    ghc-options: -Wall
+    ghc-options: -Wall -fhpc
     ghc-prof-options: -auto-all
     
     c-sources: cbits/crypto_scrypt-sse.c, cbits/sha256.c

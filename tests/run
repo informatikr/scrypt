@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+
+dist/build/scrypt-test/scrypt-test
+
+echo "----------------"
+echo "coverage report:"
+echo "----------------"
+hpc markup --destdir=tests/coverage scrypt-test.tix
+hpc report scrypt-test.tix
+
+# cleanup
+rm scrypt-test.tix
