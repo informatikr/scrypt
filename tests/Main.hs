@@ -2,16 +2,58 @@
 
 module Main (main) where
 
+import Control.Applicative ((<$>))
 import Crypto.Scrypt
 import Data.ByteString (pack)
-import Data.Maybe (fromJust)
+import Data.Maybe
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.Providers.HUnit (testCase)
+import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.HUnit ((@=?))
+import Test.QuickCheck
+import Test.QuickCheck.Property (morallyDubiousIOProperty)
+
+instance Arbitrary ScryptParams where
+    arbitrary = do
+        logN <- elements [1..14]
+        r    <- elements [1..8]
+        p    <- elements [1..2]
+        return . fromJust $ scryptParams logN r p        
+
+instance Arbitrary Pass where
+    arbitrary = Pass . pack <$> listOf (arbitrary `suchThat` (/= 0))
+
 
 main :: IO ()
-main = defaultMain [testGroup "Test vectors" testVectors]
+main = defaultMain
+    [ testGroup "Test Vectors" testVectors
+    , testGroup "Properties"
+        [ testProperty "wrong pass is invalid" prop_WrongPassNotValid
+        , testProperty "encrypt/verify" prop_EncryptVerify
+        , testProperty "new params ==> new encryption" prop_NewParamsNewEncr
+        ]
+    ]
 
+prop_WrongPassNotValid pass candidate params =
+    pass /= candidate ==> morallyDubiousIOProperty $ do
+        encr <- encryptPass params pass
+        let (valid, newEncr) = verifyPass params candidate encr
+        return $ not valid && isNothing newEncr
+
+prop_EncryptVerify params pass =
+    morallyDubiousIOProperty $ do
+        encr <- encryptPass params pass
+        let (valid, newEncr) = verifyPass params pass encr
+        return $ valid && isNothing newEncr
+
+prop_NewParamsNewEncr oldParams newParams pass =
+    oldParams /= newParams ==> morallyDubiousIOProperty $ do
+        encr <- encryptPass oldParams pass        
+        let (valid,newEncr) = verifyPass newParams pass encr
+        return $ valid && isJust newEncr && fromJust newEncr /= encr
+
+-- |Test vectors from the scrypt paper.
+--
 testVectors :: [Test]
 testVectors = map toTestCase vecs
   where
