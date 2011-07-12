@@ -11,7 +11,7 @@ import Test.Framework.Providers.HUnit (testCase)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.HUnit ((@=?))
 import Test.QuickCheck
-import Test.QuickCheck.Property (morallyDubiousIOProperty)
+import Test.QuickCheck.Property (Testable, morallyDubiousIOProperty)
 
 instance Arbitrary ScryptParams where
     arbitrary = do
@@ -34,19 +34,22 @@ main = defaultMain
         ]
     ]
 
+prop_WrongPassNotValid :: Pass -> Pass -> ScryptParams -> Property
 prop_WrongPassNotValid pass candidate params =
     pass /= candidate ==> morallyDubiousIOProperty $ do
         encr <- encryptPass params pass
         let (valid, newEncr) = verifyPass params candidate encr
         return $ not valid && isNothing newEncr
 
-prop_EncryptVerify params pass =
+prop_EncryptVerify :: Pass -> ScryptParams -> Property
+prop_EncryptVerify pass params =
     morallyDubiousIOProperty $ do
         encr <- encryptPass params pass
         let (valid, newEncr) = verifyPass params pass encr
         return $ valid && isNothing newEncr
 
-prop_NewParamsNewEncr oldParams newParams pass =
+prop_NewParamsNewEncr :: Pass -> ScryptParams -> ScryptParams -> Property
+prop_NewParamsNewEncr pass oldParams newParams =
     oldParams /= newParams ==> morallyDubiousIOProperty $ do
         encr <- encryptPass oldParams pass        
         let (valid,newEncr) = verifyPass newParams pass encr
