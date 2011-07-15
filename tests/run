@@ -8,5 +8,10 @@ echo "----------------"
 hpc markup --destdir=tests/coverage scrypt-test.tix
 hpc report scrypt-test.tix
 
+echo "------------------"
+echo "hlint suggestions:"
+echo "------------------"
+hlint Crypto
+
 # cleanup
 rm scrypt-test.tix

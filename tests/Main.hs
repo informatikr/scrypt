@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Main (main) where
+module Main where
 
 import Control.Applicative ((<$>))
 import Crypto.Scrypt
@@ -11,7 +11,7 @@ import Test.Framework.Providers.HUnit (testCase)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.HUnit ((@=?))
 import Test.QuickCheck
-import Test.QuickCheck.Property (Testable, morallyDubiousIOProperty)
+import Test.QuickCheck.Property (morallyDubiousIOProperty)
 
 instance Arbitrary ScryptParams where
     arbitrary = do
