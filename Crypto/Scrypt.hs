@@ -30,7 +30,7 @@ import System.Entropy (getEntropy)
 
 newtype Pass          = Pass     { unPass :: ByteString } deriving (Show, Eq)
 newtype Salt          = Salt     { unSalt :: ByteString } deriving (Show, Eq)
-newtype PassHash      = PassHash { unHash :: ByteString } deriving (Show,Eq)
+newtype PassHash      = PassHash { unHash :: ByteString } deriving (Show, Eq)
 newtype EncryptedPass =
     EncryptedPass { unEncryptedPass  :: ByteString } deriving (Show, Eq)
 
