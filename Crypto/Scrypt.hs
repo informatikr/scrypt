@@ -23,9 +23,10 @@ import Control.Applicative
 import qualified Data.ByteString.Base64 as Base64
 import Data.ByteString.Char8 hiding (map, concat)
 import Data.Maybe
-import Foreign
+import Foreign (Ptr, Word8, Word32, Word64, allocaBytes, castPtr)
 import Foreign.C
 import System.Entropy (getEntropy)
+import System.IO.Unsafe (unsafePerformIO)
 
 
 newtype Pass          = Pass     { unPass :: ByteString } deriving (Show, Eq)
