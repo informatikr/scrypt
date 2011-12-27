@@ -18,7 +18,10 @@ instance Arbitrary ScryptParams where
         logN <- elements [1..14]
         r    <- elements [1..8]
         p    <- elements [1..2]
-        return . fromJust $ scryptParams logN r p        
+        frequency
+            [(  1, return defaultParams)
+            ,(100, return . fromJust $ scryptParams logN r p)
+            ]
 
 instance Arbitrary Pass where
     arbitrary = Pass . pack <$> listOf (arbitrary `suchThat` (/= 0))
