@@ -33,6 +33,7 @@ main = defaultMain
     , testGroup "Properties"
         [ testProperty "wrong pass is invalid" prop_WrongPassNotValid
         , testProperty "encrypt/verify" prop_EncryptVerify
+        , testProperty "encrypt/verify'" prop_EncryptVerify'
         , testProperty "new params ==> new encryption" prop_NewParamsNewEncr
         ]
     ]
@@ -50,6 +51,12 @@ prop_EncryptVerify pass params =
         encr <- encryptPass params pass
         let (valid, newEncr) = verifyPass params pass encr
         return $ valid && isNothing newEncr
+
+prop_EncryptVerify' :: Pass -> ScryptParams -> Property
+prop_EncryptVerify' pass params =
+    morallyDubiousIOProperty $ do
+        encr <- encryptPass params pass
+        return $ verifyPass' pass encr
 
 prop_NewParamsNewEncr :: Pass -> ScryptParams -> ScryptParams -> Property
 prop_NewParamsNewEncr pass oldParams newParams =

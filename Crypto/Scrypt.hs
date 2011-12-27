@@ -199,7 +199,9 @@ verifyPass newParams candidate encrypted =
 --  encapsulated in the 'EncryptedPass'.
 --
 verifyPass' :: Pass -> EncryptedPass -> Bool
-verifyPass' pass encrypted = fst $ verifyPass defaultParams pass encrypted
+-- We never evaluate an eventual new 'EncryptedPass' from 'verifyPass', so it is
+-- safe to pass 'undefined' to verifyPass.
+verifyPass' pass encrypted = fst $ verifyPass undefined pass encrypted
 
 ------------------------------------------------------------------------------
 -- $low-level
