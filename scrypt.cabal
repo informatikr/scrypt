@@ -7,7 +7,6 @@ copyright:      Copyright 2011 Falko Peters
 author:         Falko Peters <falko.peters@gmail.com>
 maintainer:     Falko Peters <falko.peters@gmail.com>
 stability:      experimental
-tested-with:    GHC == 6.12.3
 cabal-version:  >= 1.8
 homepage:       http://github.com/informatikr/scrypt
 bug-reports:    http://github.com/informatikr/scrypt/issues
