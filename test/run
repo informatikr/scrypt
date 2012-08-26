@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+
+cabal-dev test
+
+echo "------------------"
+echo "hlint suggestions:"
+echo "------------------"
+find src ! -type d | xargs hlint
