@@ -27,7 +27,9 @@
  * online backup system.
  */
 #include <sys/types.h>
+#ifndef __MINGW32__ /* Also defined by MinGW-w64. */
 #include <sys/mman.h>
+#endif
 
 #include <emmintrin.h>
 #include <errno.h>
