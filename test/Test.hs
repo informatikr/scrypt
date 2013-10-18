@@ -14,14 +14,16 @@ import Test.HUnit ((@=?))
 import Test.QuickCheck
 import Test.QuickCheck.Property (morallyDubiousIOProperty)
 
+
 instance Arbitrary ScryptParams where
     arbitrary = do
         logN <- elements [1..14]
         r    <- elements [1..8]
         p    <- elements [1..2]
+        bufLen <- elements [1..128]
         frequency
             [(  1, return defaultParams)
-            ,(100, return . fromJust $ scryptParams logN r p)
+            ,(100, return . fromJust $ scryptParamsLen logN r p bufLen)
             ]
 
 instance Arbitrary Pass where

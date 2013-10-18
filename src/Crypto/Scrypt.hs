@@ -10,7 +10,7 @@
 module Crypto.Scrypt (
     -- * Parameters to the @scrypt@ function
     -- $params
-     ScryptParams, scryptParams, defaultParams
+     ScryptParams, scryptParams, scryptParamsLen, defaultParams
     -- * Password Storage
     -- $password-storage
     , EncryptedPass(..), encryptPass, encryptPass', verifyPass, verifyPass'
@@ -21,7 +21,7 @@ module Crypto.Scrypt (
 
 import Control.Applicative
 import qualified Data.ByteString.Base64 as Base64
-import Data.ByteString.Char8 hiding (map, concat)
+import qualified Data.ByteString.Char8 as B
 import Data.Maybe
 import Foreign (Ptr, Word8, Word32, Word64, allocaBytes, castPtr)
 import Foreign.C
@@ -29,11 +29,11 @@ import System.Entropy (getEntropy)
 import System.IO.Unsafe (unsafePerformIO)
 
 
-newtype Pass          = Pass     { unPass :: ByteString } deriving (Show, Eq)
-newtype Salt          = Salt     { unSalt :: ByteString } deriving (Show, Eq)
-newtype PassHash      = PassHash { unHash :: ByteString } deriving (Show, Eq)
+newtype Pass          = Pass     { unPass :: B.ByteString } deriving (Show, Eq)
+newtype Salt          = Salt     { unSalt :: B.ByteString } deriving (Show, Eq)
+newtype PassHash      = PassHash { unHash :: B.ByteString } deriving (Show, Eq)
 newtype EncryptedPass =
-    EncryptedPass { unEncryptedPass  :: ByteString } deriving (Show, Eq)
+    EncryptedPass { unEncryptedPass  :: B.ByteString } deriving (Show, Eq)
 
 ------------------------------------------------------------------------------
 -- $params
@@ -52,44 +52,50 @@ newtype EncryptedPass =
 -- /Running time/ is proportional to all of @N@, @r@ and @p@. Since it's
 -- influence on memory usage is small, @p@ can be used to independently tune
 -- the running time.
---
 
 -- |Encapsulates the three tuning parameters to the 'scrypt' function: @N@,
--- @r@ and @p@ (see above).
+-- @r@ and @p@ (see above) as well es the length of the derived key.
 --
-data ScryptParams = Params { logN, r, p, bufLen :: Integer} deriving (Eq)
+data ScryptParams = Params { logN, r, p, bufLen :: Integer} deriving (Eq, Show)
 
-instance Show ScryptParams where
-    show Params{..} = concat [ "ScryptParams "
-        , "{ logN=", show logN
-        , ", r="   , show r
-        , ", p="   , show p
-        , " }"
-        ]
-
--- |Constructor function for the 'ScryptParams' data type
---
+-- |Constructor function for 'ScryptParams' with default derived-key-length of
+--  64 bytes.
 scryptParams
     :: Integer
     -- ^ @log_2(N)@. Scrypt's @N@ parameter must be a power of two greater
     --   than one, thus it's logarithm to base two must be greater than zero.
     --   @128*r*N@ must be smaller than the available memory address space.
     -> Integer
-    -- ^ The parameter @r@, must be greater than zero.
+    -- ^ @r@, must be greater than zero.
     -> Integer
-    -- ^ The parameter @p@, must be greater than zero. @r@ and @p@
+    -- ^ @p@, must be greater than zero. @r@ and @p@
     --   must satisfy @r*p < 2^30@.
     -> Maybe ScryptParams
     -- ^ Returns 'Just' the parameter object for valid arguments,
     --   otherwise 'Nothing'.
     --
-scryptParams logN r p | valid     = Just ps
-                      | otherwise = Nothing
+scryptParams logN r p = scryptParamsLen logN r p 64
+
+-- |Constructor function for 'ScryptParams' with an additional parameter to
+--  control the length of the derived key. Only use this function if you are
+--  sure you need control over the length of the derived key. Use 'scryptParams'
+--  instead.
+--
+scryptParamsLen
+    :: Integer -- ^ @log_2(N)@,
+    -> Integer -- ^ @r@,
+    -> Integer -- ^ @p@,
+    -> Integer
+    -- ^ Length of the derived key (the output of 'scrypt') in bytes.
+    --   Must be greater than zero and less than or equal to @(2^32-1)*32@.
+    -> Maybe ScryptParams
+scryptParamsLen logN r p bufLen
+    | valid     = Just Params { logN, r, p, bufLen }
+    | otherwise = Nothing
   where
-    ps    = Params { logN, r, p, bufLen = 64 }
     valid = and [ logN > 0, r > 0, p > 0
                 , r*p < 2^(30 :: Int)
-                , bufLen ps <= 2^(32 :: Int)-1 * 32
+                , bufLen > 0, bufLen <= 2^(32 :: Int)-1 * 32
                 -- allocation fits into (virtual) memory
                 , 128*r*2^logN <= fromIntegral (maxBound :: CSize)
                 ]
@@ -131,19 +137,20 @@ defaultParams = fromJust (scryptParams 14 8 1)
 
 combine :: ScryptParams -> Salt -> PassHash -> EncryptedPass
 combine Params{..} (Salt salt) (PassHash passHash) =
-    EncryptedPass $ intercalate "|"
+    EncryptedPass $ B.intercalate "|"
         [ showBS logN, showBS r, showBS p
         , Base64.encode salt, Base64.encode passHash]
   where
-    showBS = pack . show
+    showBS = B.pack . show
 
 separate :: EncryptedPass -> Maybe (ScryptParams, Salt, PassHash)
-separate = go . split '|' . unEncryptedPass
+separate = go . B.split '|' . unEncryptedPass
   where
     go [logN', r', p', salt', hash'] = do
         [salt, hash] <- mapM decodeBase64 [salt', hash']
-        [logN, r, p] <- mapM (fmap fst . readInteger) [logN', r', p']
-        params       <- scryptParams logN r p
+        [logN, r, p] <- mapM (fmap fst . B.readInteger) [logN', r', p']
+        let bufLen = fromIntegral (B.length hash)
+        params       <- scryptParamsLen logN r p bufLen
         return (params, Salt salt, PassHash hash)
     go _         = Nothing
     decodeBase64 = either (const Nothing) Just . Base64.decode
@@ -210,20 +217,20 @@ verifyPass' pass encrypted = fst $ verifyPass undefined pass encrypted
 -- consider using the more convenient higher-level API above.
 --
 
--- |Calculates a 64-byte hash from the given password, salt and parameters.
+-- |Calculates a hash from the given password, salt and parameters.
 --
 scrypt :: ScryptParams -> Salt -> Pass -> PassHash
 scrypt Params{..} (Salt salt) (Pass pass) =
     PassHash <$> unsafePerformIO $
-        useAsCStringLen salt $ \(saltPtr, saltLen) ->
-        useAsCStringLen pass $ \(passPtr, passLen) ->
+        B.useAsCStringLen salt $ \(saltPtr, saltLen) ->
+        B.useAsCStringLen pass $ \(passPtr, passLen) ->
         allocaBytes (fromIntegral bufLen) $ \bufPtr -> do
             throwErrnoIfMinus1_ "crypto_scrypt" $ crypto_scrypt
                 (castPtr passPtr) (fromIntegral passLen)
                 (castPtr saltPtr) (fromIntegral saltLen)
                 (2^logN) (fromIntegral r) (fromIntegral p)
                 bufPtr (fromIntegral bufLen)
-            packCStringLen (castPtr bufPtr, fromIntegral bufLen)
+            B.packCStringLen (castPtr bufPtr, fromIntegral bufLen)
 
 foreign import ccall unsafe crypto_scrypt
     :: Ptr Word8 -> CSize         -- password
