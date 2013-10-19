@@ -29,11 +29,11 @@ import System.Entropy (getEntropy)
 import System.IO.Unsafe (unsafePerformIO)
 
 
-newtype Pass          = Pass     { unPass :: B.ByteString } deriving (Show, Eq)
-newtype Salt          = Salt     { unSalt :: B.ByteString } deriving (Show, Eq)
-newtype PassHash      = PassHash { unHash :: B.ByteString } deriving (Show, Eq)
+newtype Pass          = Pass     { getPass :: B.ByteString } deriving (Show, Eq)
+newtype Salt          = Salt     { getSalt :: B.ByteString } deriving (Show, Eq)
+newtype PassHash      = PassHash { getHash :: B.ByteString } deriving (Show, Eq)
 newtype EncryptedPass =
-    EncryptedPass { unEncryptedPass  :: B.ByteString } deriving (Show, Eq)
+    EncryptedPass { getEncryptedPass  :: B.ByteString } deriving (Show, Eq)
 
 ------------------------------------------------------------------------------
 -- $params
@@ -144,7 +144,7 @@ combine Params{..} (Salt salt) (PassHash passHash) =
     showBS = B.pack . show
 
 separate :: EncryptedPass -> Maybe (ScryptParams, Salt, PassHash)
-separate = go . B.split '|' . unEncryptedPass
+separate = go . B.split '|' . getEncryptedPass
   where
     go [logN', r', p', salt', hash'] = do
         [salt, hash] <- mapM decodeBase64 [salt', hash']
