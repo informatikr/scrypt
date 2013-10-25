@@ -1,4 +1,6 @@
 cabal-dev
+.cabal-sandbox
+cabal.sandbox.config
 dist
 .hpc
 tests/coverage
