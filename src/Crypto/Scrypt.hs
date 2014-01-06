@@ -13,7 +13,9 @@ module Crypto.Scrypt (
      ScryptParams, scryptParams, scryptParamsLen, defaultParams
     -- * Password Storage
     -- $password-storage
-    , EncryptedPass(..), encryptPass, encryptPass', verifyPass, verifyPass'
+    , EncryptedPass(..), encryptPass, encryptPass'
+    , genSalt, encryptPassWithSalt, encryptPassWithSalt'
+    , verifyPass, verifyPass'
     -- * Low-level bindings to the @scrypt@ key derivation function
     -- $low-level
     , Pass(..), Salt(..), PassHash(..), scrypt, scrypt'
@@ -155,19 +157,34 @@ separate = go . B.split '|' . getEncryptedPass
     go _         = Nothing
     decodeBase64 = either (const Nothing) Just . Base64.decode
 
+-- |Generate a random 32-byte salt.
+--
+genSalt :: IO Salt
+genSalt = Salt <$> getEntropy 32
+
 -- |Encrypt the password with the given parameters and a random 32-byte salt.
 -- The salt is read from @\/dev\/urandom@ on Unix systems or @CryptoAPI@ on
 -- Windows.
 --
 encryptPass :: ScryptParams -> Pass -> IO EncryptedPass
 encryptPass params pass = do
-    salt <- Salt <$> getEntropy 32
-    return $ combine params salt (scrypt params salt pass)
+    salt <- genSalt
+    return $ encryptPassWithSalt params salt pass
 
 -- |Equivalent to @encryptPass defaultParams@.
 --
 encryptPass' :: Pass -> IO EncryptedPass
 encryptPass' = encryptPass defaultParams
+
+-- |Encrypt the password with the given parameters and salt.
+--
+encryptPassWithSalt :: ScryptParams -> Salt -> Pass -> EncryptedPass
+encryptPassWithSalt params salt pass = combine params salt (scrypt params salt pass)
+
+-- |Equivalent to @encryptPassWithSalt defaultParams@.
+--
+encryptPassWithSalt' :: Salt -> Pass -> EncryptedPass
+encryptPassWithSalt' = encryptPassWithSalt defaultParams
 
 -- |Verify a 'Pass' against an 'EncryptedPass'. The function also takes
 --  'ScryptParams' meeting your current security requirements. In case the
