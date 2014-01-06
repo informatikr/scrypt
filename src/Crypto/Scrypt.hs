@@ -95,7 +95,7 @@ scryptParamsLen logN r p bufLen
   where
     valid = and [ logN > 0, r > 0, p > 0
                 , r*p < 2^(30 :: Int)
-                , bufLen > 0, bufLen <= 2^(32 :: Int)-1 * 32
+                , bufLen > 0, bufLen <= (2^(32 :: Int)-1) * 32
                 -- allocation fits into (virtual) memory
                 , 128*r*2^logN <= fromIntegral (maxBound :: CSize)
                 ]
