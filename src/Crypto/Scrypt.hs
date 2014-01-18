@@ -1,5 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface, OverloadedStrings,
-    RecordWildCards, NamedFieldPuns #-}
+{-# LANGUAGE ForeignFunctionInterface, OverloadedStrings, RecordWildCards #-}
 
 -- |Scrypt is a sequential memory-hard key derivation function. This module
 --  provides low-level bindings to the 'scrypt' key derivation function as
@@ -92,7 +91,7 @@ scryptParamsLen
     --   Must be greater than zero and less than or equal to @(2^32-1)*32@.
     -> Maybe ScryptParams
 scryptParamsLen logN r p bufLen
-    | valid     = Just Params { logN, r, p, bufLen }
+    | valid     = Just Params {..}
     | otherwise = Nothing
   where
     valid = and [ logN > 0, r > 0, p > 0
