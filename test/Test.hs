@@ -5,7 +5,7 @@ module Main where
 
 import Control.Applicative ((<$>))
 import Crypto.Scrypt
-import Data.ByteString (pack)
+import qualified Data.ByteString as B (pack, last, null)
 import Data.Maybe
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.Providers.HUnit (testCase)
@@ -27,7 +27,7 @@ instance Arbitrary ScryptParams where
             ]
 
 instance Arbitrary Pass where
-    arbitrary = Pass . pack <$> listOf (arbitrary `suchThat` (/= 0))
+    arbitrary = Pass . B.pack <$> arbitrary
 
 
 main :: IO ()
@@ -43,10 +43,19 @@ main = defaultMain
 
 prop_WrongPassNotValid :: Pass -> Pass -> ScryptParams -> Property
 prop_WrongPassNotValid pass candidate params =
-    pass /= candidate ==> morallyDubiousIOProperty $ do
-        encr <- encryptPassIO params pass
-        let (valid, newEncr) = verifyPass params candidate encr
-        return $ not valid && isNothing newEncr
+    pass /= candidate           ==>
+    -- Trailing NULs in a password don't change the hash. Colin Percival: This
+    -- is normal; it results from the identical behaviour in HMAC-*, since the
+    -- only places scrypt handles the password directly, it is being input to
+    -- HMAC-SHA256 as a key.
+    not (trailingNUL pass)      ==>
+    not (trailingNUL candidate) ==>
+        morallyDubiousIOProperty $ do
+            encr <- encryptPassIO params pass
+            let (valid, newEncr) = verifyPass params candidate encr
+            return $ not valid && isNothing newEncr
+  where
+    trailingNUL (Pass p) = not (B.null p) && B.last p == 0
 
 prop_EncryptVerify :: Pass -> ScryptParams -> Property
 prop_EncryptVerify pass params =
@@ -76,7 +85,7 @@ testVectors = map toTestCase vecs
     toTestCase (pass, salt, logN, r, p, dk) =
         let params = fromJust $ scryptParams logN r p
         in testCase (unwords ["vec:", show pass, show salt, show params]) $
-                PassHash (pack dk) @=? scrypt params (Salt salt) (Pass pass)
+                PassHash (B.pack dk) @=? scrypt params (Salt salt) (Pass pass)
     
     vecs =
         [( "", "", 4, 1, 1,
