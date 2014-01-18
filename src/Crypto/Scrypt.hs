@@ -127,14 +127,14 @@ defaultParams = fromJust (scryptParams 14 8 1)
 --
 -- > >>> encrypted <- encryptPassIO defaultParams (Pass "secret")
 -- > >>> print encrypted
--- > EncryptedPass {unEncryptedPass = "14|8|1|Wn5x[SNIP]nM=|Zl+p[SNIP]g=="}
+-- > EncryptedPass {getEncryptedPass = "14|8|1|Wn5x[SNIP]nM=|Zl+p[SNIP]g=="}
 -- > >>> print $ verifyPass defaultParams (Pass "secret") encrypted
 -- > (True,Nothing)
 -- > >>> print $ verifyPass defaultParams (Pass "wrong") encrypted
 -- > (False,Nothing)
 -- > >>> let newParams = fromJust $ scryptParams 16 8 1
 -- > >>> print $ verifyPass newParams (Pass "secret") encrypted
--- > (True,Just (EncryptedPass {unEncryptedPass = "16|8|1|Wn5x[SNIP]nM=|ZmWw[SNIP]Q=="}))
+-- > (True,Just (EncryptedPass {getEncryptedPass = "16|8|1|Wn5x[SNIP]nM=|ZmWw[SNIP]Q=="}))
 --
 
 combine :: ScryptParams -> Salt -> PassHash -> EncryptedPass
