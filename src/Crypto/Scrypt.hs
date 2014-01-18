@@ -13,8 +13,8 @@ module Crypto.Scrypt (
      ScryptParams, scryptParams, scryptParamsLen, defaultParams
     -- * Password Storage
     -- $password-storage
-    , EncryptedPass(..), encryptPass, encryptPass'
-    , genSalt, encryptPassWithSalt, encryptPassWithSalt'
+    , EncryptedPass(..), encryptPassIO, encryptPassIO'
+    , newSalt, encryptPass, encryptPass'
     , verifyPass, verifyPass'
     -- * Low-level bindings to the @scrypt@ key derivation function
     -- $low-level
@@ -125,7 +125,7 @@ defaultParams = fromJust (scryptParams 14 8 1)
 -- A usage example is given below, showing encryption, verification and
 -- changing 'ScryptParams':
 --
--- > >>> encrypted <- encryptPass defaultParams (Pass "secret")
+-- > >>> encrypted <- encryptPassIO defaultParams (Pass "secret")
 -- > >>> print encrypted
 -- > EncryptedPass {unEncryptedPass = "14|8|1|Wn5x[SNIP]nM=|Zl+p[SNIP]g=="}
 -- > >>> print $ verifyPass defaultParams (Pass "secret") encrypted
@@ -159,32 +159,32 @@ separate = go . B.split '|' . getEncryptedPass
 
 -- |Generate a random 32-byte salt.
 --
-genSalt :: IO Salt
-genSalt = Salt <$> getEntropy 32
+newSalt :: IO Salt
+newSalt = Salt <$> getEntropy 32
 
 -- |Encrypt the password with the given parameters and a random 32-byte salt.
 -- The salt is read from @\/dev\/urandom@ on Unix systems or @CryptoAPI@ on
 -- Windows.
 --
-encryptPass :: ScryptParams -> Pass -> IO EncryptedPass
-encryptPass params pass = do
-    salt <- genSalt
-    return $ encryptPassWithSalt params salt pass
+encryptPassIO :: ScryptParams -> Pass -> IO EncryptedPass
+encryptPassIO params pass = do
+    salt <- newSalt
+    return $ encryptPass params salt pass
 
--- |Equivalent to @encryptPass defaultParams@.
+-- |Equivalent to @encryptPassIO defaultParams@.
 --
-encryptPass' :: Pass -> IO EncryptedPass
-encryptPass' = encryptPass defaultParams
+encryptPassIO' :: Pass -> IO EncryptedPass
+encryptPassIO' = encryptPassIO defaultParams
 
 -- |Encrypt the password with the given parameters and salt.
 --
-encryptPassWithSalt :: ScryptParams -> Salt -> Pass -> EncryptedPass
-encryptPassWithSalt params salt pass = combine params salt (scrypt params salt pass)
+encryptPass :: ScryptParams -> Salt -> Pass -> EncryptedPass
+encryptPass params salt pass = combine params salt (scrypt params salt pass)
 
--- |Equivalent to @encryptPassWithSalt defaultParams@.
+-- |Equivalent to @encryptPass defaultParams@.
 --
-encryptPassWithSalt' :: Salt -> Pass -> EncryptedPass
-encryptPassWithSalt' = encryptPassWithSalt defaultParams
+encryptPass' :: Salt -> Pass -> EncryptedPass
+encryptPass' = encryptPass defaultParams
 
 -- |Verify a 'Pass' against an 'EncryptedPass'. The function also takes
 --  'ScryptParams' meeting your current security requirements. In case the

@@ -44,27 +44,27 @@ main = defaultMain
 prop_WrongPassNotValid :: Pass -> Pass -> ScryptParams -> Property
 prop_WrongPassNotValid pass candidate params =
     pass /= candidate ==> morallyDubiousIOProperty $ do
-        encr <- encryptPass params pass
+        encr <- encryptPassIO params pass
         let (valid, newEncr) = verifyPass params candidate encr
         return $ not valid && isNothing newEncr
 
 prop_EncryptVerify :: Pass -> ScryptParams -> Property
 prop_EncryptVerify pass params =
     morallyDubiousIOProperty $ do
-        encr <- encryptPass params pass
+        encr <- encryptPassIO params pass
         let (valid, newEncr) = verifyPass params pass encr
         return $ valid && isNothing newEncr
 
 prop_EncryptVerify' :: Pass -> ScryptParams -> Property
 prop_EncryptVerify' pass params =
     morallyDubiousIOProperty $ do
-        encr <- encryptPass params pass
+        encr <- encryptPassIO params pass
         return $ verifyPass' pass encr
 
 prop_NewParamsNewEncr :: Pass -> ScryptParams -> ScryptParams -> Property
 prop_NewParamsNewEncr pass oldParams newParams =
     oldParams /= newParams ==> morallyDubiousIOProperty $ do
-        encr <- encryptPass oldParams pass        
+        encr <- encryptPassIO oldParams pass        
         let (valid,newEncr) = verifyPass newParams pass encr
         return $ valid && isJust newEncr && fromJust newEncr /= encr
 
