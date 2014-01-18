@@ -5,14 +5,13 @@ module Main where
 
 import Control.Applicative ((<$>))
 import Crypto.Scrypt
-import qualified Data.ByteString as B (pack, last, null)
+import qualified Data.ByteString as B
 import Data.Maybe
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.Providers.HUnit (testCase)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.HUnit ((@=?))
 import Test.QuickCheck
-import Test.QuickCheck.Property (morallyDubiousIOProperty)
 
 
 instance Arbitrary ScryptParams where
@@ -26,8 +25,14 @@ instance Arbitrary ScryptParams where
             ,(100, return . fromJust $ scryptParamsLen logN r p bufLen)
             ]
 
+instance Arbitrary B.ByteString where
+    arbitrary = B.pack <$> arbitrary
+    
 instance Arbitrary Pass where
-    arbitrary = Pass . B.pack <$> arbitrary
+    arbitrary = Pass <$> arbitrary
+
+instance Arbitrary Salt where
+    arbitrary = Salt <$> arbitrary
 
 
 main :: IO ()
@@ -41,8 +46,8 @@ main = defaultMain
         ]
     ]
 
-prop_WrongPassNotValid :: Pass -> Pass -> ScryptParams -> Property
-prop_WrongPassNotValid pass candidate params =
+prop_WrongPassNotValid :: Pass -> Pass -> ScryptParams -> Salt -> Property
+prop_WrongPassNotValid pass candidate params salt =
     pass /= candidate           ==>
     -- Trailing NULs in a password don't change the hash. Colin Percival: This
     -- is normal; it results from the identical behaviour in HMAC-*, since the
@@ -50,32 +55,29 @@ prop_WrongPassNotValid pass candidate params =
     -- HMAC-SHA256 as a key.
     not (trailingNUL pass)      ==>
     not (trailingNUL candidate) ==>
-        morallyDubiousIOProperty $ do
-            encr <- encryptPassIO params pass
-            let (valid, newEncr) = verifyPass params candidate encr
-            return $ not valid && isNothing newEncr
+        let encr             = encryptPass params salt pass
+            (valid, newEncr) = verifyPass params candidate encr
+        in not valid && isNothing newEncr
   where
     trailingNUL (Pass p) = not (B.null p) && B.last p == 0
 
-prop_EncryptVerify :: Pass -> ScryptParams -> Property
-prop_EncryptVerify pass params =
-    morallyDubiousIOProperty $ do
-        encr <- encryptPassIO params pass
-        let (valid, newEncr) = verifyPass params pass encr
-        return $ valid && isNothing newEncr
+prop_EncryptVerify :: ScryptParams -> Salt -> Pass -> Property
+prop_EncryptVerify params salt pass = 
+    let encr             = encryptPass params salt pass
+        (valid, newEncr) = verifyPass params pass encr
+    in property $ valid && isNothing newEncr
 
-prop_EncryptVerify' :: Pass -> ScryptParams -> Property
-prop_EncryptVerify' pass params =
-    morallyDubiousIOProperty $ do
-        encr <- encryptPassIO params pass
-        return $ verifyPass' pass encr
+prop_EncryptVerify' :: ScryptParams -> Salt -> Pass -> Property
+prop_EncryptVerify' params salt pass =
+    property $ verifyPass' pass (encryptPass params salt pass)
 
-prop_NewParamsNewEncr :: Pass -> ScryptParams -> ScryptParams -> Property
-prop_NewParamsNewEncr pass oldParams newParams =
-    oldParams /= newParams ==> morallyDubiousIOProperty $ do
-        encr <- encryptPassIO oldParams pass        
-        let (valid,newEncr) = verifyPass newParams pass encr
-        return $ valid && isJust newEncr && fromJust newEncr /= encr
+prop_NewParamsNewEncr
+    :: ScryptParams -> ScryptParams -> Salt -> Pass -> Property
+prop_NewParamsNewEncr oldParams newParams salt pass =
+    oldParams /= newParams ==>
+        let encr            = encryptPass oldParams salt pass        
+            (valid,newEncr) = verifyPass newParams pass encr
+        in valid && isJust newEncr && fromJust newEncr /= encr
 
 -- |Test vectors from the scrypt paper.
 --
