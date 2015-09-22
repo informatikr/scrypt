@@ -36,30 +36,29 @@ newtype Pass          = Pass     { getPass :: B.ByteString } deriving (Show, Eq)
 newtype Salt          = Salt     { getSalt :: B.ByteString } deriving (Show, Eq)
 newtype PassHash      = PassHash { getHash :: B.ByteString } deriving (Show, Eq)
 newtype EncryptedPass =
-    EncryptedPass { getEncryptedPass  :: B.ByteString } deriving (Show)
+    EncryptedPass { getEncryptedPass  :: B.ByteString } deriving (Show, Eq)
 
 -- |Timing-resistant comparison for password hashes - time to compare
 --  two equal hashes and two differing hashes is identical. Slower
 --  than '(==)' on 'ByteString's by less than a microsecond on
 --  scrypt-sized hashes.
-instance Eq EncryptedPass where
-    (==) (EncryptedPass "") (EncryptedPass "") =
-        True
-    (==) (EncryptedPass a) (EncryptedPass b) =
-        (&&) (la == lb) $! (match (buffered a) (buffered b) True)
-      where
-        buffered bs = bs <> B.replicate (maxLen - (B.length bs)) '\0'
+timingSafeEq :: PassHash -> PassHash -> Bool
+timingSafeEq (PassHash "") (PassHash "") = True
+timingSafeEq (PassHash a) (PassHash b)   =
+    (&&) (la == lb) $! (match (buffered a) (buffered b) True)
+  where
+    buffered bs = bs <> B.replicate (maxLen - (B.length bs)) '\0'
 
-        maxLen = fromIntegral $ max la lb
+    maxLen = fromIntegral $ max la lb
 
-        (la, lb) = (B.length a, B.length b)
+    (la, lb) = (B.length a, B.length b)
 
-        match as bs acc
-          | B.null as || B.null bs =
-              acc
-          | otherwise                =
-              match (unsafeTail as) (unsafeTail bs)
-                  ((&&) acc $! (unsafeHead as == unsafeHead bs))
+    match as bs acc
+      | B.null as || B.null bs =
+          acc
+      | otherwise                =
+          match (unsafeTail as) (unsafeTail bs)
+              ((&&) acc $! (unsafeHead as == unsafeHead bs))
 
 ------------------------------------------------------------------------------
 -- $params
@@ -236,7 +235,7 @@ verifyPass newParams candidate encrypted =
     maybe (False, Nothing) verify (separate encrypted)
   where
     verify (params,salt,hash) =
-        let valid   = scrypt params salt candidate == hash
+        let valid   = (scrypt params salt candidate) `timingSafeEq` hash
             newHash = scrypt newParams salt candidate
             newEncr = if not valid || params == newParams
                         then Nothing
